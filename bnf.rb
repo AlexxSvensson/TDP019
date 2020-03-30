@@ -8,6 +8,7 @@ class Logic
     @logicParser = Parser.new("logic") do
       # Håller i variabler
       @variables = {}
+      token(/[+\-\/*]=/) {|m| m}
       token(/\s+/) #Gör inget med whitespace-tecken
       token(/\d+\.\d+/) {|d| d.to_f}
       token(/\d+/) {|d| d.to_i}
@@ -95,7 +96,7 @@ class Logic
 
       rule :assign do
         match(:our_var, :assign_operator, :var) do
-          |our_var, ao, var|
+          |name, ao, value|
           if ao == "="
             @variables[name] = value
           elsif ao == "+="
