@@ -45,13 +45,14 @@ class Logic
       end
 
       rule :expr do
-        match('(', :expr, 'or', :expr, ')') {|_, _, a, b, _| a or b }
-        match(:expr, 'or', :expr) {|_, _, a, b, _| a or b }
-        match('(', :expr, 'and', :expr, ')')  {|_, _, a, b, _| a and b }
-        match(:expr, 'and', :expr)  {|_, _, a, b, _| a and b }
-        match('(', 'not', :expr, ')') {|_, _, a,  _| not a }
-        match('not', :expr) {|_, _, a,  _| not a }
-        match(:compare)
+        #match('(', :expr, 'or', :expr, ')') {|_, _, a, b, _| a or b }
+        match(:expr, 'or', :boolean) {|_, _, a, b, _| a or b }
+        #match('(', :expr, 'and', :expr, ')')  {|_, _, a, b, _| a and b }
+        match(:expr, 'and', :boolean)  {|_, _, a, b, _| a and b }
+        #match('(', 'not', :expr, ')') {|_, _, a,  _| not a }
+        match('not', :expr) {|_, a| not a }
+        #match(:compare)
+        match(:boolean)
       end
 
       rule :func do
@@ -97,16 +98,20 @@ class Logic
       rule :assign do
         match(:our_var, :assign_operator, :var) do
           |name, ao, value|
-          if ao == "="
-            @variables[name] = value
-          elsif ao == "+="
-            @variables[name] += value
-          elsif ao == "-="
-            @variables[name] -= value
-          elsif ao == "*="
-            @variables[name] *= value
-          elsif ao == "/="
-            @variables[name] /= value
+          if @variables.key?(name) #Kollar om den variabeln är deklarera
+            if ao == "="
+              @variables[name] = value
+            elsif ao == "+="
+              @variables[name] += value
+            elsif ao == "-="
+              @variables[name] -= value
+            elsif ao == "*="
+              @variables[name] *= value
+            elsif ao == "/="
+              @variables[name] /= value
+            end
+          else
+            p "Odeklarerad variabel"
           end
         end
         #match(:var)
@@ -127,7 +132,7 @@ class Logic
       rule :var do
         match(:number_term)
         match(:string)
-        match(:boolean)
+        match(:expr)
         #match(:char)
         match(:our_var) {|a| @variables[a]}
       end
