@@ -1,120 +1,95 @@
 require './rdparse.rb'
+require './Nodes.rb'
 require 'pry'
 
-class Logic
+class Bnf
   attr_reader :variables
   def initialize
-
     @logicParser = Parser.new("logic") do
-      # Håller i variabler
-      @variables = {}
-      token(/[+\-\/*]=/) {|m| m}
-      token(/\s+/) #Gör inget med whitespace-tecken
+      token(/[<>+\-\/*=]=/) {|m| m}
+      token(/\s+/)
       token(/\d+\.\d+/) {|d| d.to_f}
       token(/\d+/) {|d| d.to_i}
-      token(/["A-Za-z\d]+/) {|m| m } #För strängar
-      token(/./) {|t| t} #fångar paranteser
+      token(/["A-Za-z\d]+/) {|m| m }
+      token(/./) {|t| t}
 
       #Regler
-      start :statement_list do
-        match(:statement_list, '\n', :valid)
-        match(:valid)
+
+      start :root do
+        match(:statement_list){|a| a}
       end
 
-      start :valid do
+      rule :statement_list do
+        match(:statement_list, :valid) {|statement_list, valid|Statement_list_node.new(statement_list, valid)}
+        match(:valid) {|valid| Valid_node.new(valid)}
+      end
+
+      rule :valid do
+        #match(:print)
+        #match(:func)
+        match(:check)
+        match(:loop)
         match(:declaration)
         match(:assign)
-        match(String) {|a| p @variables[a]}
-        match(:loop)
-        match(:expr)
-        match(:check)
-        match(:func)
+        match(/[a-z]/){|a|Get_variable_node.new(a)}
+      end
+
+      rule :print do
+        match('print', String){|_, str| Print_node.new(str)}
       end
 
       rule :loop do
-        match('while', :expr, '{', :statement_list, '}')
-        match('for', :var, :int, :int, '{', :statement_list, '}')
+        match('while', :expr, :bracket) {|_, expr, bracket| While_node.new(expr, bracket)}
+        match('for', :name, ',', :int,',', :int, :bracket){|_, var, _, from, _, to, bracket| For_node.new(var, from, to, bracket)}
       end
 
       rule :check do
-        match('if', :boolean, '{', :statement_list, '}', :check)
-        match('if', :boolean, '{', :statement_list, '}')
-        match('elsif', :boolean, '{', :statement_list, '}', :check)
-        match('elsif', :boolean, '{', :statement_list, '}')
-        match('else', '{', :statement_list, '}')
+        match('if', :expr, :bracket, :check_else) {|_, expr, bracket, check_else| If_node.new(expr, bracket, check_else)}
+        match('if', :expr, :bracket) {|_, expr, bracket| If_node.new(expr, bracket, nil)}
+      end
+
+      rule :check_else do
+        match('elsif', :expr, :bracket, :check_else){|_, expr, bracket, check_else| If_node.new(expr, bracket, check_else)}
+        match('elsif', :expr, :bracket){|_, expr, bracket| If_node.new(expr, bracket, nil)}
+        match('else', :bracket){|_, bracket| Else_node.new(bracket)}
+      end
+
+      rule :define_func do
+        match('def', :name, :paramater)
+      end
+
+      rule :bracket do
+        match('{', :statement_list, '}')  do |_, statement_list, _|
+          Bracket_node.new(statement_list)
+        end
       end
 
       rule :expr do
-        #match('(', :expr, 'or', :expr, ')') {|_, _, a, b, _| a or b }
-        match(:expr, 'or', :boolean) {|_, _, a, b, _| a or b }
-        #match('(', :expr, 'and', :expr, ')')  {|_, _, a, b, _| a and b }
-        match(:expr, 'and', :boolean)  {|_, _, a, b, _| a and b }
-        #match('(', 'not', :expr, ')') {|_, _, a,  _| not a }
-        match('not', :expr) {|_, a| not a }
-        #match(:compare)
+        match(:expr, 'and', :expr)  {|a, _, b| And_node.new(a, b) }
+        match(:expr, 'or', :expr) {|a, _, b| Or_node.new(a, b) }
+        match('not', :expr) {|_, a| Not_node.new(a) }
         match(:boolean)
+        match(:compare)
       end
 
       rule :func do
-        match('func', :name, '(', :parameter, ')', '{', :statement_list, '}')
+        match('func', :name, '(', :parameter, ')', :bracket)
       end
 
       rule :paramater do
-        match(':parameter', ',', ':var')
-        match(':var')
+        match('(', ':parameter',':var', ')'){|_, parameter, var, _|}
+        match(':parameter',':var'){|parameter, var|}
+        match('(', ':var', ')'){|_, parameter, var, _|}
+        match(':var'){|parameter, var|}
       end
 
       rule :declaration do
-        match(:data_type, :name, '=', :var) do
-          |dt, name, _, value|
-          if dt == "integer" and value.instance_of?(Integer)
-            @variables[name] = value
-          elsif dt == "float" and value.instance_of?(Float)
-            @variables[name] = value
-          elsif dt == "string" and value.instance_of?(String)
-            @variables[name] = value
-          elsif dt == "boolean" and (value.instance_of?(TrueClass) or value.instance_of?(FalseClass))
-            @variables[name] = value
-          else
-            p "du gjorde fel"
-          end
-        end
-        match(:data_type, :name) do
-          |dt, name|
-          if dt == "integer"
-            @variables[name] = 0
-          elsif dt == "float"
-            @variables[name] = 0.0
-          elsif dt == "string"
-            @variables[name] = ""
-          elsif dt == "boolean"
-            @variables[name] = false
-          else
-            p "du gjorde fel"
-          end
-        end
+        match(:data_type, :name, '=', :var){|dt, name, _, value|Declaration_node.new(dt, name, value)}
+        match(:data_type, :name){|dt, name|Declaration_node_default.new(dt, name)}
       end
 
       rule :assign do
-        match(:our_var, :assign_operator, :var) do
-          |name, ao, value|
-          if @variables.key?(name) #Kollar om den variabeln är deklarera
-            if ao == "="
-              @variables[name] = value
-            elsif ao == "+="
-              @variables[name] += value
-            elsif ao == "-="
-              @variables[name] -= value
-            elsif ao == "*="
-              @variables[name] *= value
-            elsif ao == "/="
-              @variables[name] /= value
-            end
-          else
-            p "Odeklarerad variabel"
-          end
-        end
-        #match(:var)
+        match(:our_var, :assign_operator, :var){|name, op, value|Assign_node.new(name, op, value)}
       end
 
       rule:data_type do
@@ -134,64 +109,53 @@ class Logic
         match(:string)
         match(:expr)
         #match(:char)
-        match(:our_var) {|a| @variables[a]}
+        match(:our_var) {|a| Get_variable_node.new(a)}
       end
 
       rule :our_var do
-        match(String)
+        match(/[A-Za-z\d]+/)
       end
 
       rule :number_term do
-        match(:number_factor, '+', :number_factor) {|a, _, b| a+b}
-        match(:number_factor, '-', :number_factor) {|a, _, b| a-b}
+        match(:number_factor, '+', :number_factor) {|a, _, b| Addition_node.new(a, b)}
+        match(:number_factor, '-', :number_factor) {|a, _, b| Subtraction_node.new(a, b)}
         match(:number_factor)
       end
 
       rule :number_factor do
-        match(:number, '*', :number) {|a, _, b| a*b}
-        match(:number, '/', :number) {|a, _, b| a/b}
+        match(:number, '*', :number) {|a, _, b| Multiplication_node.new(a, b)}
+        match(:number, '/', :number) {|a, _, b| Division_node.new(a, b)}
         match(:number)
       end
 
       rule :number do
-          match('(', :number_term, ')')
-          match(:int)
-          match(:float)
+          match('(', :number_term, ')') {|_, term, _| Number_term_node.new(term)}
+          match(:int) {|a| Number_node.new(a)}
+          match(:float) {|a| Number_node.new(a)}
       end
 
       rule :int do
-        #match(:int, :operator, Integer)
         match(Integer)
       end
 
       rule :float do
-        #match(:float, :operator, :number)
         match(Float)
       end
 
       rule :boolean do
-        match('true') {true}
-        match('false') {false}
-        #match(:expr)
+        match('true') {Boolean_node.new(true)}
+        match('false') {Boolean_node.new(false)}
       end
 
       rule :string do
-        match('"', String, '"')
-        match(/"[A-Za-z\d]+"/)
+        # match(/"/, String, /"/) {|_, str, _| String_node.new(str)}
+        match(/"[A-Za-z\d]*"/) {|str| String_node.new(str)}
       end
-
-
 
       rule :compare do
-        match(:var, :compare_operator, :var)
-      end
-
-      rule :operator do
-        match('+')
-        match('-')
-        match('*')
-        match('/')
-      end
+        match('(', :var, :compare_operator, :var,')'){|_, a, op, b, _|Compare_node.new(a, op, b)}
+        match(:our_var, :compare_operator, :var){|a, op, b|Compare_node.new(a, op, b)}
+        end
 
       rule :assign_operator do
         match('=')
@@ -217,33 +181,27 @@ class Logic
     ["quit","exit","bye",""].include?(str.chomp)
   end
 
-  def evaluate
-    print "[logic] "
-    str = gets
+  def evaluate()
+    file = File.open("test1.txt")
+    str = file.read
+    log
     if done(str) then
       puts "Bye."
     else
-      puts "=> #{@logicParser.parse str}"
-      evaluate
+      root_node = @logicParser.parse str
+      puts "=> #{root_node.evalu}"
     end
   end
 
-  def evaluate_test(str) #evaluate för test
-    if done(str) then
-      return 0
-    else
-      return @logicParser.parse str
-    end
-  end
-
-  def log(state = true)
+  def log(state = false)
     if state
       @logicParser.logger.level = Logger::DEBUG
     else
       @logicParser.logger.level = Logger::WARN
     end
   end
+
 end
 
-l = Logic.new
-l.evaluate
+l = Bnf.new
+l.evaluate()
