@@ -141,6 +141,8 @@ class Get_variable_node
     if check_var_exist(@name)
       p $variables[get_var_scope(@name)][@name]
       $variables[get_var_scope(@name)][@name]
+    else
+      p "Variabel finns ej"
     end
   end
 end
