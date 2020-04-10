@@ -1,0 +1,13 @@
+if true
+{
+  integer x = 1
+  if true
+  {
+    x
+    x = 5
+    x
+    integer x = 2 
+    x
+  }
+  x
+}
