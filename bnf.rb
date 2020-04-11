@@ -29,9 +29,10 @@ class Bnf
         #match(:func)
         match(:check)
         match(:loop)
+        match(:define_func)
         match(:declaration)
         match(:assign)
-        match(/[a-z]/){|a|Get_variable_node.new(a)}
+        #match(/[a-z]/){|a|Get_variable_node.new(a)}
       end
 
       rule :print do
@@ -55,7 +56,7 @@ class Bnf
       end
 
       rule :define_func do
-        match('def', :name, :paramater)
+        match('func', :name, :paramater_list, :bracket){|_, name, parameter_list, bracket| Add_func_node.new(name, parameter_list, bracket)}
       end
 
       rule :bracket do
@@ -76,11 +77,15 @@ class Bnf
         match('func', :name, '(', :parameter, ')', :bracket)
       end
 
-      rule :paramater do
-        match('(', ':parameter',':var', ')'){|_, parameter, var, _|}
-        match(':parameter',':var'){|parameter, var|}
-        match('(', ':var', ')'){|_, parameter, var, _|}
-        match(':var'){|parameter, var|}
+      rule :paramater_list do
+        match('(', :parameter_list, :parameter, ')')
+        match('(', :parameter, ')')
+        match(:parameter_list,:parameter)
+        match(:parameter)
+      end
+
+      rule :parameter do
+        match(:data_type, :name)
       end
 
       rule :declaration do
@@ -193,7 +198,7 @@ class Bnf
     end
   end
 
-  def log(state = false)
+  def log(state = true)
     if state
       @logicParser.logger.level = Logger::DEBUG
     else
