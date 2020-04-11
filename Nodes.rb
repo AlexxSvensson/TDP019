@@ -1,5 +1,6 @@
 $variables = [{}]
 $current_scope = 0
+$functions = {}
 
 def increase_scope()
   $current_scope += 1
@@ -31,6 +32,17 @@ def get_var_scope(name)
     end
   end
   return nil
+end
+
+class Add_func_node
+  def initialize(name, parameter, bracket)
+    @name = name
+    @parameter = paramater
+    @bracket = bracket.eval
+  end
+  def evalu()
+    @functions[@name] = [@parameter, @bracket]
+  end
 end
 
 class Statement_list_node
@@ -113,7 +125,6 @@ class For_node
   end
 end
 
-
 class Bracket_node
   def initialize(statement_list)
     @statement_list = statement_list
@@ -142,7 +153,7 @@ class Get_variable_node
       p $variables[get_var_scope(@name)][@name]
       $variables[get_var_scope(@name)][@name]
     else
-      p "Variabel finns ej"
+      "Variabel finns ej"
     end
   end
 end
